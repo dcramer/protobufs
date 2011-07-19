@@ -4,10 +4,12 @@
 
 # We must use setuptools, not distutils, because we need to use the
 # namespace_packages option for the "google" package.
-from ez_setup import use_setuptools
-use_setuptools()
+try:
+    from setuptools import setup, find_packages, Extension
+except ImportError:
+    from ez_setup import use_setuptools
+    use_setuptools()
 
-from setuptools import setup, Extension
 from distutils.spawn import find_executable
 import sys
 import os
@@ -16,14 +18,14 @@ import subprocess
 maintainer_email = "protobuf@googlegroups.com"
 
 # Find the Protocol Compiler.
-if os.path.exists("../src/protoc"):
-  protoc = "../src/protoc"
-elif os.path.exists("../src/protoc.exe"):
-  protoc = "../src/protoc.exe"
-elif os.path.exists("../vsprojects/Debug/protoc.exe"):
-  protoc = "../vsprojects/Debug/protoc.exe"
-elif os.path.exists("../vsprojects/Release/protoc.exe"):
-  protoc = "../vsprojects/Release/protoc.exe"
+if os.path.exists("./src/protoc"):
+  protoc = "./src/protoc"
+elif os.path.exists("./src/protoc.exe"):
+  protoc = "./src/protoc.exe"
+elif os.path.exists("./vsprojects/Debug/protoc.exe"):
+  protoc = "./vsprojects/Debug/protoc.exe"
+elif os.path.exists("./vsprojects/Release/protoc.exe"):
+  protoc = "./vsprojects/Release/protoc.exe"
 else:
   protoc = find_executable("protoc")
 
@@ -32,7 +34,7 @@ def generate_proto(source):
   .proto file.  Does nothing if the output already exists and is newer than
   the input."""
 
-  output = source.replace(".proto", "_pb2.py").replace("../src/", "")
+  output = source.replace(".proto", "_pb2.py").replace("./src/", "")
 
   if not os.path.exists(source):
     print "Can't find required file: " + source
@@ -45,11 +47,11 @@ def generate_proto(source):
 
     if protoc == None:
       sys.stderr.write(
-          "protoc is not installed nor found in ../src.  Please compile it "
+          "protoc is not installed nor found in ./src.  Please compile it "
           "or install the binary package.\n")
       sys.exit(-1)
 
-    protoc_command = [ protoc, "-I../src", "-I.", "--python_out=.", source ]
+    protoc_command = [ protoc, "-I./src", "-I.", "--python_out=.", source ]
     if subprocess.call(protoc_command) != 0:
       sys.exit(-1)
 
@@ -59,13 +61,13 @@ def MakeTestSuite():
   if 'google' in sys.modules:
     del sys.modules['google']
 
-  generate_proto("../src/google/protobuf/unittest.proto")
-  generate_proto("../src/google/protobuf/unittest_custom_options.proto")
-  generate_proto("../src/google/protobuf/unittest_import.proto")
-  generate_proto("../src/google/protobuf/unittest_mset.proto")
-  generate_proto("../src/google/protobuf/unittest_no_generic_services.proto")
-  generate_proto("google/protobuf/internal/more_extensions.proto")
-  generate_proto("google/protobuf/internal/more_messages.proto")
+  generate_proto("./src/google/protobuf/unittest.proto")
+  generate_proto("./src/google/protobuf/unittest_custom_options.proto")
+  generate_proto("./src/google/protobuf/unittest_import.proto")
+  generate_proto("./src/google/protobuf/unittest_mset.proto")
+  generate_proto("./src/google/protobuf/unittest_no_generic_services.proto")
+  generate_proto("python/google/protobuf/internal/more_extensions.proto")
+  generate_proto("python/google/protobuf/internal/more_messages.proto")
 
   import unittest
   import google.protobuf.internal.generator_test     as generator_test
@@ -101,8 +103,8 @@ if __name__ == '__main__':
   else:
     # Generate necessary .proto file if it doesn't exist.
     # TODO(kenton):  Maybe we should hook this into a distutils command?
-    generate_proto("../src/google/protobuf/descriptor.proto")
-    generate_proto("../src/google/protobuf/compiler/plugin.proto")
+    generate_proto("./src/google/protobuf/descriptor.proto")
+    generate_proto("./src/google/protobuf/compiler/plugin.proto")
 
   ext_module_list = []
 
@@ -111,15 +113,15 @@ if __name__ == '__main__':
     print "Using EXPERIMENTAL C++ Implmenetation."
     ext_module_list.append(Extension(
         "google.protobuf.internal._net_proto2___python",
-        [ "google/protobuf/pyext/python_descriptor.cc",
-          "google/protobuf/pyext/python_protobuf.cc",
-          "google/protobuf/pyext/python-proto2.cc" ],
+        [ "python/google/protobuf/pyext/python_descriptor.cc",
+          "python/google/protobuf/pyext/python_protobuf.cc",
+          "python/google/protobuf/pyext/python-proto2.cc" ],
         include_dirs = [ "." ],
         libraries = [ "protobuf" ]))
 
   setup(name = 'protobuf',
         version = '2.4.1',
-        packages = [ 'google' ],
+        packages = find_packages(exclude="*test*"),
         namespace_packages = [ 'google' ],
         test_suite = 'setup.MakeTestSuite',
         # Must list modules explicitly so that we don't install tests.
@@ -141,6 +143,7 @@ if __name__ == '__main__':
           'google.protobuf.service',
           'google.protobuf.service_reflection',
           'google.protobuf.text_format' ],
+
         ext_modules = ext_module_list,
         url = 'http://code.google.com/p/protobuf/',
         maintainer = maintainer_email,
