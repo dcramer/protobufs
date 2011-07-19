@@ -4,10 +4,13 @@
 
 # We must use setuptools, not distutils, because we need to use the
 # namespace_packages option for the "google" package.
-from ez_setup import use_setuptools
-use_setuptools()
+try:
+    from setuptools import setup, Extension, find_packages
+except ImportError:
+    from ez_setup import use_setuptools
+    use_setuptools()
+    from setuptools import setup, Extension, find_packages
 
-from setuptools import setup, Extension
 from distutils.spawn import find_executable
 import sys
 import os
@@ -15,17 +18,22 @@ import subprocess
 
 maintainer_email = "protobuf@googlegroups.com"
 
+root = os.path.dirname(__file__)
+
 # Find the Protocol Compiler.
-if os.path.exists("../src/protoc"):
-  protoc = "../src/protoc"
-elif os.path.exists("../src/protoc.exe"):
-  protoc = "../src/protoc.exe"
-elif os.path.exists("../vsprojects/Debug/protoc.exe"):
-  protoc = "../vsprojects/Debug/protoc.exe"
-elif os.path.exists("../vsprojects/Release/protoc.exe"):
-  protoc = "../vsprojects/Release/protoc.exe"
-else:
-  protoc = find_executable("protoc")
+exec_paths = [
+    os.path.join(root, 'src', 'protoc'),
+    os.path.join(root, 'src', 'protoc.exe'),
+    os.path.join(root, 'vsprojects', 'Debug', 'protoc.exe'),
+    os.path.join(root, 'vsprojects', 'Release', 'protoc.exe'),
+    find_executable('protoc'),
+]
+protoc = None
+while exec_paths:
+    path = exec_paths.pop()
+    if os.path.exists(path):
+        protoc = path
+        break
 
 def generate_proto(source):
   """Invokes the Protocol Compiler to generate a _pb2.py from the given
@@ -45,11 +53,11 @@ def generate_proto(source):
 
     if protoc == None:
       sys.stderr.write(
-          "protoc is not installed nor found in ../src.  Please compile it "
+          "protoc is not installed nor found in src.  Please compile it "
           "or install the binary package.\n")
       sys.exit(-1)
 
-    protoc_command = [ protoc, "-I../src", "-I.", "--python_out=.", source ]
+    protoc_command = [ protoc, "-Isrc", "-I.", "--python_out=python", source ]
     if subprocess.call(protoc_command) != 0:
       sys.exit(-1)
 
@@ -59,13 +67,13 @@ def MakeTestSuite():
   if 'google' in sys.modules:
     del sys.modules['google']
 
-  generate_proto("../src/google/protobuf/unittest.proto")
-  generate_proto("../src/google/protobuf/unittest_custom_options.proto")
-  generate_proto("../src/google/protobuf/unittest_import.proto")
-  generate_proto("../src/google/protobuf/unittest_mset.proto")
-  generate_proto("../src/google/protobuf/unittest_no_generic_services.proto")
-  generate_proto("google/protobuf/internal/more_extensions.proto")
-  generate_proto("google/protobuf/internal/more_messages.proto")
+  generate_proto(os.path.join(root, 'src', 'google', 'protobuf', 'unittest.proto'))
+  generate_proto(os.path.join(root, 'src', 'google', 'protobuf', 'unittest_custom_options.proto'))
+  generate_proto(os.path.join(root, 'src', 'google', 'protobuf', 'unittest_import.proto'))
+  generate_proto(os.path.join(root, 'src', 'google', 'protobuf', 'unittest_mset.proto'))
+  generate_proto(os.path.join(root, 'src', 'google', 'protobuf', 'unittest_no_generic_services.proto'))
+  generate_proto(os.path.join(root, 'python', 'google', 'protobuf', 'internal', 'more_extensions.proto'))
+  generate_proto(os.path.join(root, 'python', 'google', 'protobuf', 'internal', 'more_messages.proto'))
 
   import unittest
   import google.protobuf.internal.generator_test     as generator_test
@@ -101,8 +109,8 @@ if __name__ == '__main__':
   else:
     # Generate necessary .proto file if it doesn't exist.
     # TODO(kenton):  Maybe we should hook this into a distutils command?
-    generate_proto("../src/google/protobuf/descriptor.proto")
-    generate_proto("../src/google/protobuf/compiler/plugin.proto")
+    generate_proto(os.path.join(root, 'src', 'google', 'protobuf', 'descriptor.proto'))
+    generate_proto(os.path.join(root, 'src', 'google', 'protobuf', 'compiler', 'plugin.proto'))
 
   ext_module_list = []
 
@@ -111,42 +119,23 @@ if __name__ == '__main__':
     print "Using EXPERIMENTAL C++ Implmenetation."
     ext_module_list.append(Extension(
         "google.protobuf.internal._net_proto2___python",
-        [ "google/protobuf/pyext/python_descriptor.cc",
-          "google/protobuf/pyext/python_protobuf.cc",
-          "google/protobuf/pyext/python-proto2.cc" ],
-        include_dirs = [ "." ],
+        [ os.path.join(root, 'python', 'google', 'protobuf', 'pyext', 'python_descriptor.cc'),
+          os.path.join(root, 'python', 'google', 'protobuf', 'pyext', 'python_protobuf.cc'),
+          os.path.join(root, 'python', 'google', 'protobuf', 'pyext', 'python-proto2.cc') ],
+        include_dirs = [ root ],
         libraries = [ "protobuf" ]))
 
   setup(name = 'protobuf',
         version = '2.4.1',
-        packages = [ 'google' ],
+        package_dir = { 'google': 'python/google' },
+        packages = find_packages('python'),
         namespace_packages = [ 'google' ],
         test_suite = 'setup.MakeTestSuite',
-        # Must list modules explicitly so that we don't install tests.
-        py_modules = [
-          'google.protobuf.internal.api_implementation',
-          'google.protobuf.internal.containers',
-          'google.protobuf.internal.cpp_message',
-          'google.protobuf.internal.decoder',
-          'google.protobuf.internal.encoder',
-          'google.protobuf.internal.message_listener',
-          'google.protobuf.internal.python_message',
-          'google.protobuf.internal.type_checkers',
-          'google.protobuf.internal.wire_format',
-          'google.protobuf.descriptor',
-          'google.protobuf.descriptor_pb2',
-          'google.protobuf.compiler.plugin_pb2',
-          'google.protobuf.message',
-          'google.protobuf.reflection',
-          'google.protobuf.service',
-          'google.protobuf.service_reflection',
-          'google.protobuf.text_format' ],
         ext_modules = ext_module_list,
         url = 'http://code.google.com/p/protobuf/',
         maintainer = maintainer_email,
         maintainer_email = 'protobuf@googlegroups.com',
         license = 'New BSD License',
         description = 'Protocol Buffers',
-        long_description =
-          "Protocol Buffers are Google's data interchange format.",
-        )
+        long_description = open(os.path.join(root, 'README.txt')).read(),
+        zip_safe = False)
