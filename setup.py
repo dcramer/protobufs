@@ -109,8 +109,10 @@ if __name__ == '__main__':
   else:
     # Generate necessary .proto file if it doesn't exist.
     # TODO(kenton):  Maybe we should hook this into a distutils command?
-    generate_proto(os.path.join(root, 'src', 'google', 'protobuf', 'descriptor.proto'))
-    generate_proto(os.path.join(root, 'src', 'google', 'protobuf', 'compiler', 'plugin.proto'))
+    for path in [os.path.join(root, 'src', 'google', 'protobuf', 'descriptor.proto'),
+                 os.path.join(root, 'src', 'google', 'protobuf', 'compiler', 'plugin.proto')]:
+        if os.path.exists(path):
+            generate_proto(path)
 
   ext_module_list = []
 
@@ -129,6 +131,10 @@ if __name__ == '__main__':
         version = '2.4.1',
         package_dir = { 'google': 'python/google' },
         packages = find_packages('python'),
+        package_data = {
+            '': ['*.cc', '*.h', '*.proto'],
+            'google.protobuf': ['pyext/*'],
+        },
         namespace_packages = [ 'google' ],
         test_suite = 'setup.MakeTestSuite',
         ext_modules = ext_module_list,
