@@ -1,3 +1,5 @@
 build
 dist
 protobuf.egg-info
+python/google/protobuf/compiler/
+python/google/protobuf/descriptor_pb2.py
